@@ -12,26 +12,29 @@ def scrape(query):
 	'q': query,
 	'start': 0,
     }
-    headers = {
-	'User Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:53.0) \
-	Gecko/20100101 Firefox/53.0'
-    }
-    r=s.get("https://www.google.com/search", params=params)
-    soup = BeautifulSoup(r.content)
-    soup=soup.findAll('h3', {'class': 'r'})
-    tokens={}
-    for text in soup:
-        for text2 in text.a.contents:
-            # all text titles in text2
-            li=nltk.work_tokenize(text2.string)
-            for text3 in li:
-                if text3 in tokens:
-                    tokens[text3]=0
-                else:
-                    tokens[text3]+=1
+
+    named_tokens={}  # dict. of named tokens
+    for i in range(5): # for 50 search results
+        r=s.get("https://www.google.com/search", params=params)
+        soup = BeautifulSoup(r.content,'lxml')
+        soup=soup.findAll('h3', {'class': 'r'})
+        params['start']+=10 # every page consists of 10 results
+        
+        for text in soup:
+        # iterate through titles
+            for text2 in text.a.contents:
+                # all text titles in text2
+                li=nltk.word_tokenize(text2.string.encode('utf-8'))
+                tagged = nltk.pos_tag(li)
+                namedEnt = nltk.ne_chunk(tagged)
+                for text3 in namedEnt:
+                    if(type(text3))==nltk.tree.Tree:
+                        if text3[0][0] in named_tokens:
+                            named_tokens[text3[0][0]]+=1
+                        else:
+                            named_tokens[text3[0][0]]=1
             
-    print(tokens)
-    return tokens
+    return named_tokens
     
 
 
@@ -43,12 +46,10 @@ def search():
 def result():
     if request.method=='POST':
         q= request.form
-	print (q['query'])
-	result= scrape(q['query'])
-        print(result)
-	return render_template("result.html",result=q)
+	result= sorted(scrape(q['query']).items(), key = lambda x:x[1], reverse = True)
+	return render_template("result.html",result=result)
 
 
 if __name__ == '__main__':
     app.run(debug = True)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
